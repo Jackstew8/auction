@@ -261,7 +261,7 @@ function CarForm({ initial, onSave, onCancel }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="form-label">Year *</label>
           <input className="form-input" placeholder="2014" maxLength={4} required value={form.year} onChange={e => set('year', e.target.value)} />
@@ -270,13 +270,13 @@ function CarForm({ initial, onSave, onCancel }) {
           <label className="form-label">Make *</label>
           <input className="form-input" placeholder="Ford" required value={form.make} onChange={e => set('make', e.target.value)} />
         </div>
-        <div>
+        <div className="col-span-2">
           <label className="form-label">Model *</label>
           <input className="form-input" placeholder="Explorer" required value={form.model} onChange={e => set('model', e.target.value)} />
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="form-label">Color</label>
           <input className="form-input" placeholder="Red" value={form.color} onChange={e => set('color', e.target.value)} />
@@ -285,7 +285,7 @@ function CarForm({ initial, onSave, onCancel }) {
           <label className="form-label">Mileage</label>
           <input className="form-input" placeholder="168,000" value={form.miles} onChange={e => set('miles', e.target.value)} />
         </div>
-        <div>
+        <div className="col-span-2">
           <label className="form-label">Max Bid ($)</label>
           <input className="form-input" placeholder="3,500" value={form.maxBid} onChange={e => set('maxBid', e.target.value)} />
         </div>
@@ -293,13 +293,13 @@ function CarForm({ initial, onSave, onCancel }) {
 
       <div>
         <label className="form-label">Interest Level</label>
-        <div className="flex gap-2 mt-1">
+        <div className="grid grid-cols-2 gap-2 mt-1">
           {INTEREST_LEVELS.map(lvl => (
             <button key={lvl.value} type="button" onClick={() => set('interest', lvl.value)}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+              className={`py-3 text-sm font-semibold rounded-xl border transition-all ${
                 form.interest === lvl.value
                   ? `${lvl.bg} ${lvl.text} ${lvl.border}`
-                  : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
+                  : 'bg-gray-50 text-gray-400 border-gray-200'
               }`}>
               {lvl.label}
             </button>
@@ -312,10 +312,10 @@ function CarForm({ initial, onSave, onCancel }) {
         <div className="flex flex-wrap gap-2 mt-1">
           {QUICK_TAGS.map(tag => (
             <button key={tag.label} type="button" onClick={() => toggleTag(tag.label)}
-              className={`px-3 py-1 text-xs rounded-full border font-medium transition-all ${
+              className={`px-4 py-2 text-sm rounded-full border font-medium transition-all ${
                 form.tags.includes(tag.label)
                   ? tag.color
-                  : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-400 border-gray-200'
               }`}>
               {tag.label}
             </button>
@@ -327,7 +327,7 @@ function CarForm({ initial, onSave, onCancel }) {
         <label className="form-label flex items-center gap-1.5">
           <Wrench size={13} className="text-orange-500" /> Mechanical
         </label>
-        <textarea className="form-input resize-none" rows={3}
+        <textarea className="form-input resize-none" rows={4}
           placeholder="e.g. Overheating issue, low on coolant, possible sway bar links, knock in front end..."
           value={form.mechanical} onChange={e => set('mechanical', e.target.value)} />
       </div>
@@ -336,20 +336,20 @@ function CarForm({ initial, onSave, onCancel }) {
         <label className="form-label flex items-center gap-1.5">
           <Paintbrush size={13} className="text-blue-500" /> Cosmetic
         </label>
-        <textarea className="form-input resize-none" rows={3}
+        <textarea className="form-input resize-none" rows={4}
           placeholder="e.g. Minor front bumper damage, light scratches on driver side panels..."
           value={form.cosmetic} onChange={e => set('cosmetic', e.target.value)} />
       </div>
 
-      <div className="flex gap-2 pt-1">
+      <div className="flex gap-2 pt-1 pb-4">
         <button type="submit"
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm flex items-center justify-center gap-1.5 transition-colors">
-          <Check size={15} />
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl text-base flex items-center justify-center gap-1.5 transition-colors">
+          <Check size={16} />
           {initial ? 'Update Car' : 'Add Car'}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+            className="px-5 py-3.5 border border-gray-300 text-gray-600 rounded-xl text-base font-medium">
             Cancel
           </button>
         )}
@@ -464,13 +464,13 @@ function VisitForm({ onSave, onCancel }) {
           <input className="form-input" placeholder="City, State" value={location} onChange={e => setLocation(e.target.value)} />
         </div>
       </div>
-      <div className="flex gap-2 pt-1">
+      <div className="flex gap-2 pt-1 pb-2">
         <button type="submit"
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm flex items-center justify-center gap-1.5">
-          <Check size={15} /> Create Visit
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl text-base flex items-center justify-center gap-1.5">
+          <Check size={16} /> Create Visit
         </button>
         <button type="button" onClick={onCancel}
-          className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+          className="px-5 py-3.5 border border-gray-300 text-gray-600 rounded-xl text-base font-medium">
           Cancel
         </button>
       </div>
@@ -569,28 +569,29 @@ function VisitDetail({ visit, onBack, onUpdate }) {
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-gray-900 text-white shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={onBack} className="p-1.5 hover:bg-gray-700 rounded-lg transition-colors">
-            <ArrowLeft size={18} />
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button onClick={onBack} className="p-2.5 hover:bg-gray-700 rounded-xl transition-colors shrink-0">
+            <ArrowLeft size={20} />
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="font-bold text-base leading-tight truncate">{visit.name}</h1>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-400 truncate">
               {[formatDate(visit.date), visit.location].filter(Boolean).join(' · ')}
             </p>
           </div>
           <button onClick={() => printVisit(visit)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors">
-            <Printer size={15} /> Print
+            className="p-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors shrink-0"
+            title="Print">
+            <Printer size={18} />
           </button>
           <button onClick={() => { setEditingCar(null); setShowForm(true) }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold transition-colors">
-            <Plus size={15} /> Add Car
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-semibold transition-colors shrink-0">
+            <Plus size={16} /> Add Car
           </button>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+      <main className="max-w-4xl mx-auto px-4 py-4 space-y-4">
         {showForm && !editingCar && (
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">New Car</h2>
@@ -607,7 +608,7 @@ function VisitDetail({ visit, onBack, onUpdate }) {
               { value: 'maybe', label: 'Maybe', cls: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
               { value: 'pass',  label: 'Pass',  cls: 'bg-gray-100 text-gray-500 border-gray-300' },
             ].map(tab => (
-              <button key={tab.value} onClick={() => setFilter(tab.value)}
+              <button key={tab.value} onClick={() => setFilter(tab.value)} style={{minHeight: '40px'}}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                   filter === tab.value ? tab.cls : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
                 }`}>
@@ -651,19 +652,19 @@ function HomeScreen({ visits, onOpenVisit, onDeleteVisit, onAddVisit }) {
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-gray-900 text-white shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Car size={22} className="text-blue-400" />
             <span className="text-lg font-bold tracking-tight">Auction Preview</span>
           </div>
           <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold transition-colors">
-            <Plus size={15} /> New Visit
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-semibold transition-colors">
+            <Plus size={16} /> New Visit
           </button>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+      <main className="max-w-4xl mx-auto px-4 py-4 space-y-4">
         {showForm && (
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">New Auction Visit</h2>
