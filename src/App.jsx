@@ -712,7 +712,7 @@ export default function App() {
   useEffect(() => {
     fetch('/api/visits')
       .then(r => r.json())
-      .then(data => { setVisits(data); setLoading(false) })
+      .then(data => { setVisits(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
