@@ -32,6 +32,7 @@ export async function init() {
       color TEXT DEFAULT '',
       miles TEXT DEFAULT '',
       max_bid TEXT DEFAULT '',
+      mmr TEXT DEFAULT '',
       interest TEXT DEFAULT 'maybe',
       tags JSONB DEFAULT '[]',
       mechanical TEXT DEFAULT '',
@@ -39,6 +40,8 @@ export async function init() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `)
+  // Add mmr column if it doesn't exist yet (migration)
+  await pool.query(`ALTER TABLE cars ADD COLUMN IF NOT EXISTS mmr TEXT DEFAULT ''`)
   console.log('Database ready')
 }
 
@@ -55,6 +58,7 @@ function mapCar(c) {
     color: c.color || '',
     miles: c.miles || '',
     maxBid: c.max_bid || '',
+    mmr: c.mmr || '',
     interest: c.interest || 'maybe',
     tags: c.tags || [],
     mechanical: c.mechanical || '',
@@ -108,11 +112,11 @@ app.delete('/api/visits/:id', async (req, res) => {
 
 app.post('/api/visits/:visitId/cars', async (req, res) => {
   try {
-    const { id, run, lane, year, make, model, color, miles, maxBid, interest, tags, mechanical, cosmetic } = req.body
+    const { id, run, lane, year, make, model, color, miles, maxBid, mmr, interest, tags, mechanical, cosmetic } = req.body
     await pool.query(
-      `INSERT INTO cars (id, visit_id, run, lane, year, make, model, color, miles, max_bid, interest, tags, mechanical, cosmetic)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-      [id, req.params.visitId, run, lane, year, make, model, color, miles, maxBid, interest, JSON.stringify(tags || []), mechanical, cosmetic]
+      `INSERT INTO cars (id, visit_id, run, lane, year, make, model, color, miles, max_bid, mmr, interest, tags, mechanical, cosmetic)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [id, req.params.visitId, run, lane, year, make, model, color, miles, maxBid, mmr, interest, JSON.stringify(tags || []), mechanical, cosmetic]
     )
     res.json(req.body)
   } catch (err) {
@@ -123,12 +127,12 @@ app.post('/api/visits/:visitId/cars', async (req, res) => {
 
 app.put('/api/visits/:visitId/cars/:carId', async (req, res) => {
   try {
-    const { run, lane, year, make, model, color, miles, maxBid, interest, tags, mechanical, cosmetic } = req.body
+    const { run, lane, year, make, model, color, miles, maxBid, mmr, interest, tags, mechanical, cosmetic } = req.body
     await pool.query(
       `UPDATE cars SET run=$1, lane=$2, year=$3, make=$4, model=$5, color=$6, miles=$7,
-       max_bid=$8, interest=$9, tags=$10, mechanical=$11, cosmetic=$12
-       WHERE id=$13 AND visit_id=$14`,
-      [run, lane, year, make, model, color, miles, maxBid, interest, JSON.stringify(tags || []), mechanical, cosmetic, req.params.carId, req.params.visitId]
+       max_bid=$8, mmr=$9, interest=$10, tags=$11, mechanical=$12, cosmetic=$13
+       WHERE id=$14 AND visit_id=$15`,
+      [run, lane, year, make, model, color, miles, maxBid, mmr, interest, JSON.stringify(tags || []), mechanical, cosmetic, req.params.carId, req.params.visitId]
     )
     res.json(req.body)
   } catch (err) {

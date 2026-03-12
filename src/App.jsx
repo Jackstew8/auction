@@ -21,7 +21,7 @@ const INTEREST_LEVELS = [
 
 const emptyCarForm = {
   run: '', lane: '', year: '', make: '', model: '',
-  color: '', miles: '', maxBid: '',
+  color: '', miles: '', maxBid: '', mmr: '',
   tags: [], mechanical: '', cosmetic: '',
   interest: 'maybe',
 }
@@ -73,11 +73,12 @@ function generatePrintHTML(visit) {
     <div class="car${idx % 2 === 1 ? ' car-alt' : ''}">
       <div class="car-top">
         <div class="car-left">
-          ${runLabel ? `<span class="badge badge-dark">${runLabel}</span>` : ''}
+          ${runLabel ? `<span class="badge badge-lane">${runLabel}</span>` : ''}
           <span class="car-name">${car.year} ${car.make} ${car.model}</span>
           ${metaParts ? `<span class="car-meta">${metaParts}</span>` : ''}
         </div>
         <div class="car-right">
+          ${car.mmr ? `<span class="badge badge-mmr">MMR $${car.mmr}</span>` : ''}
           ${car.maxBid ? `<span class="badge badge-dark">Max $${car.maxBid}</span>` : ''}
           <span class="interest" style="color:${lvl.color};border-color:${lvl.color}">${lvl.label}</span>
         </div>
@@ -155,6 +156,8 @@ function generatePrintHTML(visit) {
       white-space: nowrap;
     }
     .badge-dark { background: #1f2937; color: #fff; }
+    .badge-lane { background: #2563eb; color: #fff; }
+    .badge-mmr  { background: #7c3aed; color: #fff; }
 
     .car-name { font-size: 12pt; font-weight: 700; }
     .car-meta { font-size: 9.5pt; color: #555; }
@@ -253,41 +256,45 @@ function CarForm({ initial, onSave, onCancel }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="form-label">Lane #</label>
-          <input className="form-input" placeholder="7" value={form.lane} onChange={e => set('lane', e.target.value)} />
+          <input className="form-input" value={form.lane} onChange={e => set('lane', e.target.value)} />
         </div>
         <div>
           <label className="form-label">Run #</label>
-          <input className="form-input" placeholder="58" value={form.run} onChange={e => set('run', e.target.value)} />
+          <input className="form-input" value={form.run} onChange={e => set('run', e.target.value)} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="form-label">Year *</label>
-          <input className="form-input" placeholder="2014" maxLength={4} required value={form.year} onChange={e => set('year', e.target.value)} />
+          <input className="form-input" maxLength={4} required value={form.year} onChange={e => set('year', e.target.value)} />
         </div>
         <div>
           <label className="form-label">Make *</label>
-          <input className="form-input" placeholder="Ford" required value={form.make} onChange={e => set('make', e.target.value)} />
+          <input className="form-input" required value={form.make} onChange={e => set('make', e.target.value)} />
         </div>
         <div className="col-span-2">
           <label className="form-label">Model *</label>
-          <input className="form-input" placeholder="Explorer" required value={form.model} onChange={e => set('model', e.target.value)} />
+          <input className="form-input" required value={form.model} onChange={e => set('model', e.target.value)} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="form-label">Color</label>
-          <input className="form-input" placeholder="Red" value={form.color} onChange={e => set('color', e.target.value)} />
+          <input className="form-input" value={form.color} onChange={e => set('color', e.target.value)} />
         </div>
         <div>
           <label className="form-label">Mileage</label>
-          <input className="form-input" placeholder="168,000" value={form.miles} onChange={e => set('miles', e.target.value)} />
+          <input className="form-input" value={form.miles} onChange={e => set('miles', e.target.value)} />
         </div>
-        <div className="col-span-2">
+        <div>
           <label className="form-label">Max Bid ($)</label>
-          <input className="form-input" placeholder="3,500" value={form.maxBid} onChange={e => set('maxBid', e.target.value)} />
+          <input className="form-input" value={form.maxBid} onChange={e => set('maxBid', e.target.value)} />
+        </div>
+        <div>
+          <label className="form-label">MMR ($)</label>
+          <input className="form-input" value={form.mmr} onChange={e => set('mmr', e.target.value)} />
         </div>
       </div>
 
@@ -380,6 +387,11 @@ function CarCard({ car, onEdit, onDelete }) {
                 Max ${car.maxBid}
               </span>
             )}
+            {car.mmr && (
+              <span className="bg-purple-700 text-white text-xs font-bold px-2 py-0.5 rounded">
+                MMR ${car.mmr}
+              </span>
+            )}
           </div>
           <h3 className="text-lg font-bold text-gray-900 leading-tight">
             {car.year} {car.make} {car.model}
@@ -451,7 +463,7 @@ function VisitForm({ onSave, onCancel }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="form-label">Auction Name *</label>
-        <input className="form-input" placeholder="e.g. Manheim, Copart, ADESA..." required autoFocus
+        <input className="form-input" required autoFocus
           value={name} onChange={e => setName(e.target.value)} />
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -461,7 +473,7 @@ function VisitForm({ onSave, onCancel }) {
         </div>
         <div>
           <label className="form-label">Location</label>
-          <input className="form-input" placeholder="City, State" value={location} onChange={e => setLocation(e.target.value)} />
+          <input className="form-input" value={location} onChange={e => setLocation(e.target.value)} />
         </div>
       </div>
       <div className="flex gap-2 pt-1 pb-2">
