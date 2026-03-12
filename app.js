@@ -4,7 +4,7 @@ import pg from 'pg'
 import cors from 'cors'
 
 const { Pool } = pg
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const pool = new Pool({ connectionString: process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL })
 
 export const app = express()
 app.use(cors())
