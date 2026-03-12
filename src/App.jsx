@@ -54,12 +54,11 @@ const INTEREST_PRINT = {
 }
 
 function generatePrintHTML(visit) {
-  const sorted = [
-    ...visit.cars.filter(c => c.interest === 'hot'),
-    ...visit.cars.filter(c => c.interest === 'good'),
-    ...visit.cars.filter(c => c.interest === 'maybe'),
-    ...visit.cars.filter(c => c.interest === 'pass'),
-  ]
+  const sorted = [...visit.cars].sort((a, b) => {
+    const laneDiff = (parseInt(a.lane) || 0) - (parseInt(b.lane) || 0)
+    if (laneDiff !== 0) return laneDiff
+    return (parseInt(a.run) || 0) - (parseInt(b.run) || 0)
+  })
 
   const carRows = sorted.map((car, idx) => {
     const lvl = INTEREST_PRINT[car.interest] || INTEREST_PRINT.maybe
@@ -106,7 +105,7 @@ function generatePrintHTML(visit) {
 
     body {
       font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
-      font-size: 9pt;
+      font-size: 11pt;
       color: #111;
       background: #fff;
       -webkit-print-color-adjust: exact;
@@ -119,62 +118,63 @@ function generatePrintHTML(visit) {
       justify-content: space-between;
       align-items: flex-end;
       border-bottom: 2.5px solid #111;
-      padding-bottom: 5px;
-      margin-bottom: 8px;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
     }
-    .header-title { font-size: 13pt; font-weight: 800; letter-spacing: -0.3px; }
-    .header-meta  { font-size: 8pt; color: #555; text-align: right; line-height: 1.5; }
+    .header-title { font-size: 15pt; font-weight: 800; letter-spacing: -0.3px; }
+    .header-meta  { font-size: 9.5pt; color: #555; text-align: right; line-height: 1.5; }
 
     /* ── Cars ── */
-    .cars { display: flex; flex-direction: column; gap: 4px; }
+    .cars { display: flex; flex-direction: column; gap: 5px; }
 
     .car {
       border: 1px solid #d1d5db;
-      border-radius: 4px;
-      padding: 5px 8px;
+      border-radius: 5px;
+      padding: 8px 12px;
       break-inside: avoid;
       page-break-inside: avoid;
+      background: #ffffff;
     }
-    .car-alt { background: #f9fafb; }
+    .car-alt { background: #eef4ff; }
 
     /* top row */
     .car-top {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
-    .car-left  { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; flex: 1; min-width: 0; }
-    .car-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .car-left  { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+    .car-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
     .badge {
-      font-size: 7pt;
+      font-size: 8.5pt;
       font-weight: 700;
-      padding: 1px 5px;
+      padding: 2px 7px;
       border-radius: 3px;
       white-space: nowrap;
     }
     .badge-dark { background: #1f2937; color: #fff; }
 
-    .car-name { font-size: 10pt; font-weight: 700; }
-    .car-meta { font-size: 8pt; color: #555; }
+    .car-name { font-size: 12pt; font-weight: 700; }
+    .car-meta { font-size: 9.5pt; color: #555; }
 
     .interest {
-      font-size: 7.5pt;
+      font-size: 9pt;
       font-weight: 800;
       letter-spacing: 0.4px;
-      padding: 1px 6px;
+      padding: 2px 8px;
       border-radius: 3px;
       border: 1.5px solid;
       white-space: nowrap;
     }
 
     /* tags */
-    .tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
     .tag {
-      font-size: 7.5pt;
+      font-size: 9pt;
       font-weight: 600;
-      padding: 0px 5px;
+      padding: 1px 7px;
       border-radius: 20px;
       border: 1px solid #999;
       color: #444;
@@ -182,12 +182,12 @@ function generatePrintHTML(visit) {
     }
 
     /* detail rows */
-    .details { margin-top: 3px; display: flex; flex-direction: column; gap: 2px; }
-    .detail-row { display: flex; gap: 5px; font-size: 8pt; line-height: 1.35; }
+    .details { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; }
+    .detail-row { display: flex; gap: 6px; font-size: 9.5pt; line-height: 1.4; }
     .detail-label {
       font-weight: 700;
       text-transform: uppercase;
-      font-size: 7pt;
+      font-size: 8pt;
       color: #555;
       white-space: nowrap;
       padding-top: 1px;
@@ -244,7 +244,7 @@ function CarForm({ initial, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!form.year || !form.make || !form.model) return
-    onSave({ ...form, id: initial?.id || Date.now() })
+    onSave({ ...form, id: initial?.id || String(Date.now()) })
   }
 
   return (
@@ -252,12 +252,12 @@ function CarForm({ initial, onSave, onCancel }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="form-label">Run #</label>
-          <input className="form-input" placeholder="7" value={form.run} onChange={e => set('run', e.target.value)} />
+          <label className="form-label">Lane #</label>
+          <input className="form-input" placeholder="7" value={form.lane} onChange={e => set('lane', e.target.value)} />
         </div>
         <div>
-          <label className="form-label">Lane #</label>
-          <input className="form-input" placeholder="9" value={form.lane} onChange={e => set('lane', e.target.value)} />
+          <label className="form-label">Run #</label>
+          <input className="form-input" placeholder="58" value={form.run} onChange={e => set('run', e.target.value)} />
         </div>
       </div>
 
@@ -444,7 +444,7 @@ function VisitForm({ onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!name) return
-    onSave({ id: Date.now(), name, date, location, cars: [] })
+    onSave({ id: String(Date.now()), name, date, location, cars: [] })
   }
 
   return (
@@ -530,20 +530,30 @@ function VisitDetail({ visit, onBack, onUpdate }) {
   const [editingCar, setEditingCar] = useState(null)
   const [filter, setFilter] = useState('all')
 
-  const updateCars = (cars) => onUpdate({ ...visit, cars })
-
-  const addCar = (car) => {
-    updateCars([...visit.cars, car])
+  const addCar = async (car) => {
+    await fetch(`/api/visits/${visit.id}/cars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(car),
+    })
+    onUpdate({ ...visit, cars: [...visit.cars, car] })
     setShowForm(false)
   }
 
-  const saveCar = (updated) => {
-    updateCars(visit.cars.map(c => c.id === updated.id ? updated : c))
+  const saveCar = async (updated) => {
+    await fetch(`/api/visits/${visit.id}/cars/${updated.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    })
+    onUpdate({ ...visit, cars: visit.cars.map(c => c.id === updated.id ? updated : c) })
     setEditingCar(null)
   }
 
-  const deleteCar = (id) => {
-    if (confirm('Remove this car?')) updateCars(visit.cars.filter(c => c.id !== id))
+  const deleteCar = async (id) => {
+    if (!confirm('Remove this car?')) return
+    await fetch(`/api/visits/${visit.id}/cars/${id}`, { method: 'DELETE' })
+    onUpdate({ ...visit, cars: visit.cars.filter(c => c.id !== id) })
   }
 
   const counts = {
@@ -693,32 +703,44 @@ function HomeScreen({ visits, onOpenVisit, onDeleteVisit, onAddVisit }) {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'auction-visits'
-
-function loadVisits() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
 export default function App() {
-  const [visits, setVisits] = useState(loadVisits)
+  const [visits, setVisits] = useState([])
+  const [loading, setLoading] = useState(true)
   const [activeVisitId, setActiveVisitId] = useState(null)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(visits))
-  }, [visits])
+    fetch('/api/visits')
+      .then(r => r.json())
+      .then(data => { setVisits(data); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
 
-  const addVisit    = (v) => setVisits(p => [...p, v])
-  const deleteVisit = (id) => {
-    if (confirm('Delete this visit and all its cars?')) setVisits(p => p.filter(v => v.id !== id))
+  const addVisit = async (v) => {
+    await fetch('/api/visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(v),
+    })
+    setVisits(p => [...p, v])
   }
+
+  const deleteVisit = async (id) => {
+    if (!confirm('Delete this visit and all its cars?')) return
+    await fetch(`/api/visits/${id}`, { method: 'DELETE' })
+    setVisits(p => p.filter(v => v.id !== id))
+  }
+
   const updateVisit = (updated) => setVisits(p => p.map(v => v.id === updated.id ? updated : v))
 
   const active = visits.find(v => v.id === activeVisitId)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Loading...</p>
+      </div>
+    )
+  }
 
   if (active) {
     return <VisitDetail visit={active} onBack={() => setActiveVisitId(null)} onUpdate={updateVisit} />
