@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Printer, Trash2, Pencil, Check, Car, X,
   ArrowLeft, Calendar, MapPin, ChevronRight, Wrench, Paintbrush,
-  ClipboardList,
+  ClipboardList, Search,
 } from 'lucide-react'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -645,6 +645,81 @@ function LotView({ lot, stocks, onAdd, onDelete }) {
   )
 }
 
+// ─── StockSearch ──────────────────────────────────────────────────────────────
+
+function StockSearch({ months, onJump }) {
+  const [query, setQuery] = useState('')
+
+  const results = []
+  if (query.length > 0) {
+    for (const m of months) {
+      for (const s of m.stocks) {
+        if (s.stock_number.includes(query)) {
+          results.push({ ...s, monthId: m.id, month: m.month })
+        }
+      }
+    }
+  }
+
+  const lotOf = (key) => LOTS.find(l => l.key === key) || LOTS[0]
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+        <Search size={16} className="text-gray-400 shrink-0" />
+        <input
+          className="flex-1 text-base font-mono py-2 outline-none bg-transparent"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={5}
+          placeholder="Find a stock #"
+          value={query}
+          onChange={e => setQuery(e.target.value.replace(/\D/g, '').slice(0, 5))}
+        />
+        {query && (
+          <button onClick={() => setQuery('')} className="p-1 text-gray-400 hover:text-gray-600">
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      {query.length > 0 && (
+        <div className="max-h-72 overflow-y-auto">
+          {results.length === 0 ? (
+            <div className="px-3 py-4 text-center text-sm text-gray-400">
+              No matches for <span className="font-mono font-bold">{query}</span>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              <div className="px-3 py-1.5 bg-gray-50 text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                {results.length} match{results.length !== 1 ? 'es' : ''}
+              </div>
+              {results.map(r => {
+                const lot = lotOf(r.lot)
+                return (
+                  <button key={r.id} onClick={() => onJump(r.monthId)}
+                    className="w-full flex items-center justify-between px-3 py-3 hover:bg-gray-50 active:bg-gray-100 text-left transition-colors">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`px-2.5 py-1 rounded-md border font-mono font-bold text-sm ${lot.chip}`}>
+                        {r.stock_number}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-gray-900 leading-tight">{lot.label}</div>
+                        <div className="text-xs text-gray-500 leading-tight">{formatMonth(r.month)}</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── MonthForm ────────────────────────────────────────────────────────────────
 
 function MonthForm({ existingMonths, onSave, onCancel }) {
@@ -996,21 +1071,24 @@ export default function App() {
               </div>
             )}
             {reconMonths.length > 0 && (
-              <div>
-                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                  {reconMonths.length} Month{reconMonths.length !== 1 ? 's' : ''}
-                </h2>
-                <div className="space-y-3">
-                  {reconMonths.map(month => (
-                    <ReconMonthCard
-                      key={month.id}
-                      month={month}
-                      onOpen={() => setActiveMonthId(month.id)}
-                      onDelete={() => deleteMonth(month.id)}
-                    />
-                  ))}
+              <>
+                <StockSearch months={reconMonths} onJump={setActiveMonthId} />
+                <div>
+                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    {reconMonths.length} Month{reconMonths.length !== 1 ? 's' : ''}
+                  </h2>
+                  <div className="space-y-3">
+                    {reconMonths.map(month => (
+                      <ReconMonthCard
+                        key={month.id}
+                        month={month}
+                        onOpen={() => setActiveMonthId(month.id)}
+                        onDelete={() => deleteMonth(month.id)}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </>
         )}
