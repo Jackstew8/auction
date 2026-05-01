@@ -645,6 +645,79 @@ function LotView({ lot, stocks, onAdd, onDelete }) {
   )
 }
 
+// ─── MonthForm ────────────────────────────────────────────────────────────────
+
+function MonthForm({ existingMonths, onSave, onCancel }) {
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const [month, setMonth] = useState('')
+  const [year, setYear] = useState(String(now.getFullYear()))
+  const [error, setError] = useState('')
+
+  const MONTHS = [
+    { v: '01', label: 'January' },   { v: '02', label: 'February' },
+    { v: '03', label: 'March' },     { v: '04', label: 'April' },
+    { v: '05', label: 'May' },       { v: '06', label: 'June' },
+    { v: '07', label: 'July' },      { v: '08', label: 'August' },
+    { v: '09', label: 'September' }, { v: '10', label: 'October' },
+    { v: '11', label: 'November' },  { v: '12', label: 'December' },
+  ]
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!month) { setError('Pick a month'); return }
+    if (!/^\d{4}$/.test(year)) { setError('Year must be 4 digits'); return }
+    const monthStr = `${year}-${month}`
+    if (existingMonths.includes(monthStr)) { setError(`${formatMonth(monthStr)} already exists — opening it`); }
+    onSave(monthStr)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="form-label">Month</label>
+        <div className="grid grid-cols-3 gap-2">
+          {MONTHS.map(m => (
+            <button key={m.v} type="button" onClick={() => { setMonth(m.v); setError('') }}
+              className={`py-3 text-sm font-semibold rounded-xl border transition-all ${
+                month === m.v
+                  ? 'bg-green-100 text-green-800 border-green-400'
+                  : 'bg-gray-50 text-gray-500 border-gray-200'
+              }`}>
+              {m.label.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="form-label">Year</label>
+        <input
+          className="form-input text-lg font-mono text-center"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={4}
+          value={year}
+          onChange={e => { setYear(e.target.value.replace(/\D/g, '').slice(0, 4)); setError('') }}
+        />
+      </div>
+
+      {error && <p className="text-sm text-red-500 font-semibold">{error}</p>}
+
+      <div className="flex gap-2 pt-1 pb-2">
+        <button type="submit"
+          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3.5 rounded-xl text-base flex items-center justify-center gap-1.5">
+          <Check size={16} /> Create
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-5 py-3.5 border border-gray-300 text-gray-600 rounded-xl text-base font-medium">
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
 // ─── ReconMonthDetail ─────────────────────────────────────────────────────────
 
 function ReconMonthDetail({ month, onBack, onAddStock, onDeleteStock }) {
@@ -743,6 +816,7 @@ export default function App() {
   const [showVisitForm, setShowVisitForm] = useState(false)
   const [reconMonths, setReconMonths] = useState([])
   const [activeMonthId, setActiveMonthId] = useState(null)
+  const [showMonthForm, setShowMonthForm] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -769,15 +843,14 @@ export default function App() {
   const updateVisit = (updated) => setVisits(p => p.map(v => v.id === updated.id ? updated : v))
 
   // ── Reconciliation actions ────────────────────────────────────────────────
-  const addMonth = async () => {
-    const now = new Date()
-    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const addMonth = async (monthStr) => {
     const existing = reconMonths.find(m => m.month === monthStr)
-    if (existing) { setActiveMonthId(existing.id); return }
+    if (existing) { setActiveMonthId(existing.id); setShowMonthForm(false); return }
     const m = { id: String(Date.now()), month: monthStr, stocks: [] }
     await fetch('/api/recon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) })
     setReconMonths(p => [m, ...p])
     setActiveMonthId(m.id)
+    setShowMonthForm(false)
   }
   const deleteMonth = async (id) => {
     if (!confirm('Delete this month and all its stock numbers?')) return
@@ -852,7 +925,7 @@ export default function App() {
                 <Plus size={15} /> New Visit
               </button>
             ) : (
-              <button onClick={addMonth}
+              <button onClick={() => setShowMonthForm(true)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-semibold transition-colors">
                 <Plus size={15} /> New Month
               </button>
@@ -905,7 +978,17 @@ export default function App() {
         {/* ── Recon section ── */}
         {section === 'recon' && (
           <>
-            {reconMonths.length === 0 && (
+            {showMonthForm && (
+              <div className="bg-white rounded-xl shadow-sm p-5">
+                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">New Reconciliation Month</h2>
+                <MonthForm
+                  existingMonths={reconMonths.map(m => m.month)}
+                  onSave={addMonth}
+                  onCancel={() => setShowMonthForm(false)}
+                />
+              </div>
+            )}
+            {reconMonths.length === 0 && !showMonthForm && (
               <div className="text-center py-20 text-gray-400">
                 <ClipboardList size={48} className="mx-auto mb-4 opacity-20" />
                 <p className="text-lg font-semibold">No months yet</p>
