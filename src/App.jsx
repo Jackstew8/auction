@@ -645,21 +645,14 @@ function LotView({ lot, stocks, onAdd, onDelete }) {
   )
 }
 
-// ─── StockSearch ──────────────────────────────────────────────────────────────
+// ─── StockSearch (within a single month) ─────────────────────────────────────
 
-function StockSearch({ months, onJump }) {
+function StockSearch({ stocks, onJumpToLot }) {
   const [query, setQuery] = useState('')
 
-  const results = []
-  if (query.length > 0) {
-    for (const m of months) {
-      for (const s of m.stocks) {
-        if (s.stock_number.includes(query)) {
-          results.push({ ...s, monthId: m.id, month: m.month })
-        }
-      }
-    }
-  }
+  const results = query.length > 0
+    ? stocks.filter(s => s.stock_number.includes(query))
+    : []
 
   const lotOf = (key) => LOTS.find(l => l.key === key) || LOTS[0]
 
@@ -672,7 +665,7 @@ function StockSearch({ months, onJump }) {
           inputMode="numeric"
           pattern="[0-9]*"
           maxLength={5}
-          placeholder="Find a stock #"
+          placeholder="Find a stock # in this month"
           value={query}
           onChange={e => setQuery(e.target.value.replace(/\D/g, '').slice(0, 5))}
         />
@@ -687,7 +680,7 @@ function StockSearch({ months, onJump }) {
         <div className="max-h-72 overflow-y-auto">
           {results.length === 0 ? (
             <div className="px-3 py-4 text-center text-sm text-gray-400">
-              No matches for <span className="font-mono font-bold">{query}</span>
+              Not found in this month: <span className="font-mono font-bold">{query}</span>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -697,16 +690,13 @@ function StockSearch({ months, onJump }) {
               {results.map(r => {
                 const lot = lotOf(r.lot)
                 return (
-                  <button key={r.id} onClick={() => onJump(r.monthId)}
+                  <button key={r.id} onClick={() => { onJumpToLot(r.lot); setQuery('') }}
                     className="w-full flex items-center justify-between px-3 py-3 hover:bg-gray-50 active:bg-gray-100 text-left transition-colors">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className={`px-2.5 py-1 rounded-md border font-mono font-bold text-sm ${lot.chip}`}>
                         {r.stock_number}
                       </span>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-gray-900 leading-tight">{lot.label}</div>
-                        <div className="text-xs text-gray-500 leading-tight">{formatMonth(r.month)}</div>
-                      </div>
+                      <span className="text-sm font-bold text-gray-900">{lot.label}</span>
                     </div>
                     <ChevronRight size={16} className="text-gray-300 shrink-0" />
                   </button>
@@ -832,7 +822,10 @@ function ReconMonthDetail({ month, onBack, onAddStock, onDeleteStock }) {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-3 py-3">
+      <main className="max-w-4xl mx-auto px-3 py-3 space-y-3">
+        {month.stocks.length > 0 && (
+          <StockSearch stocks={month.stocks} onJumpToLot={setActiveLot} />
+        )}
         <LotView
           lot={lot}
           stocks={month.stocks}
@@ -1071,24 +1064,21 @@ export default function App() {
               </div>
             )}
             {reconMonths.length > 0 && (
-              <>
-                <StockSearch months={reconMonths} onJump={setActiveMonthId} />
-                <div>
-                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                    {reconMonths.length} Month{reconMonths.length !== 1 ? 's' : ''}
-                  </h2>
-                  <div className="space-y-3">
-                    {reconMonths.map(month => (
-                      <ReconMonthCard
-                        key={month.id}
-                        month={month}
-                        onOpen={() => setActiveMonthId(month.id)}
-                        onDelete={() => deleteMonth(month.id)}
-                      />
-                    ))}
-                  </div>
+              <div>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                  {reconMonths.length} Month{reconMonths.length !== 1 ? 's' : ''}
+                </h2>
+                <div className="space-y-3">
+                  {reconMonths.map(month => (
+                    <ReconMonthCard
+                      key={month.id}
+                      month={month}
+                      onOpen={() => setActiveMonthId(month.id)}
+                      onDelete={() => deleteMonth(month.id)}
+                    />
+                  ))}
                 </div>
-              </>
+              </div>
             )}
           </>
         )}
