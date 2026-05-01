@@ -583,50 +583,51 @@ function LotView({ lot, stocks, onAdd, onDelete }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Entry box */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide text-center mb-3">
+      <div className="bg-white rounded-xl shadow-sm p-3">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide text-center mb-2">
           {lot.label} · {lotStocks.length} unit{lotStocks.length !== 1 ? 's' : ''}
         </p>
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            className={`flex-1 text-center text-3xl font-mono font-bold tracking-[0.25em] border-2 rounded-xl py-4 bg-gray-50 outline-none transition-colors ${
-              error ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 focus:border-blue-400'
-            }`}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={5}
-            placeholder="·····"
-            value={input}
-            onChange={handleChange}
-            autoFocus
-          />
-          <button
-            onClick={() => submit(input)}
-            disabled={input.length !== 5}
-            className="px-5 bg-blue-600 disabled:bg-gray-200 text-white disabled:text-gray-400 rounded-xl font-bold text-sm transition-colors active:scale-95">
-            Add
-          </button>
-        </div>
+        <input
+          ref={inputRef}
+          className={`w-full text-center text-4xl font-mono font-bold border-2 rounded-xl py-4 bg-gray-50 outline-none transition-colors ${
+            error ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 focus:border-blue-400'
+          }`}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={5}
+          placeholder="·····"
+          value={input}
+          onChange={handleChange}
+          autoFocus
+        />
         {error
-          ? <p className="text-xs text-red-500 mt-2 text-center">{error}</p>
-          : <p className="text-xs text-gray-400 mt-2 text-center">Auto-adds when 5 digits entered</p>
+          ? <p className="text-xs text-red-500 mt-1.5 text-center font-semibold">{error}</p>
+          : <p className="text-[11px] text-gray-400 mt-1.5 text-center">Auto-adds at 5 digits</p>
         }
       </div>
 
-      {/* Stock chips */}
+      {/* Stock list */}
       {lotStocks.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="flex flex-wrap gap-2">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Recent (newest first)
+            </span>
+            <span className="text-[11px] font-bold text-gray-400">
+              {lotStocks.length}
+            </span>
+          </div>
+          <div className="divide-y divide-gray-100">
             {[...lotStocks].reverse().map(s => (
-              <div key={s.id}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border font-mono font-bold text-sm ${lot.chip}`}>
-                {s.stock_number}
+              <div key={s.id} className="flex items-center justify-between px-3 py-2.5">
+                <span className={`px-2.5 py-1 rounded-md border font-mono font-bold text-base ${lot.chip}`}>
+                  {s.stock_number}
+                </span>
                 <button onClick={() => onDelete(s.id)}
-                  className="opacity-50 hover:opacity-100 transition-opacity active:scale-90">
-                  <X size={13} />
+                  className="p-2 -mr-1 text-gray-400 hover:text-red-600 active:scale-90 transition-all">
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}
@@ -635,7 +636,7 @@ function LotView({ lot, stocks, onAdd, onDelete }) {
       )}
 
       {lotStocks.length === 0 && (
-        <div className="text-center py-10 text-gray-400">
+        <div className="text-center py-8 text-gray-400">
           <p className="text-sm font-medium">No stock numbers yet</p>
           <p className="text-xs mt-1">Type a 5-digit number above</p>
         </div>
@@ -653,29 +654,29 @@ function ReconMonthDetail({ month, onBack, onAddStock, onDeleteStock }) {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <header className="bg-gray-900 text-white shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 pt-3 pb-3 space-y-3">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-2.5 hover:bg-gray-700 rounded-xl transition-colors shrink-0">
-              <ArrowLeft size={20} />
+      <header className="bg-gray-900 text-white shadow-lg sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-3 pt-2 pb-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <button onClick={onBack} className="p-2 hover:bg-gray-700 rounded-lg transition-colors shrink-0">
+              <ArrowLeft size={18} />
             </button>
             <div className="flex-1 min-w-0">
-              <h1 className="font-bold text-base leading-tight">{formatMonth(month.month)}</h1>
-              <p className="text-xs text-gray-400">{total} total unit{total !== 1 ? 's' : ''}</p>
+              <h1 className="font-bold text-sm leading-tight">{formatMonth(month.month)}</h1>
+              <p className="text-[11px] text-gray-400 leading-tight">{total} total unit{total !== 1 ? 's' : ''}</p>
             </div>
           </div>
 
           {/* Lot tabs */}
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-4 gap-1">
             {LOTS.map(l => {
               const count = month.stocks.filter(s => s.lot === l.key).length
               return (
                 <button key={l.key} onClick={() => setActiveLot(l.key)}
-                  className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
-                    activeLot === l.key ? `${l.tabBg} text-white shadow-sm` : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  className={`py-2 px-1 rounded-lg font-bold transition-all ${
+                    activeLot === l.key ? `${l.tabBg} text-white shadow-sm` : 'bg-gray-700 text-gray-300'
                   }`}>
-                  <span className="block">{l.label}</span>
-                  <span className="block text-[11px] mt-0.5 opacity-80">{count}</span>
+                  <span className="block text-[11px] leading-tight truncate">{l.label}</span>
+                  <span className="block text-xs mt-0.5 opacity-80">{count}</span>
                 </button>
               )
             })}
@@ -683,7 +684,7 @@ function ReconMonthDetail({ month, onBack, onAddStock, onDeleteStock }) {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-4">
+      <main className="max-w-4xl mx-auto px-3 py-3">
         <LotView
           lot={lot}
           stocks={month.stocks}
