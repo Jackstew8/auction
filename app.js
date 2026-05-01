@@ -42,6 +42,21 @@ export async function init() {
   `)
   // Add mmr column if it doesn't exist yet (migration)
   await pool.query(`ALTER TABLE cars ADD COLUMN IF NOT EXISTS mmr TEXT DEFAULT ''`)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS recon_months (
+      id TEXT PRIMARY KEY,
+      month TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS recon_stocks (
+      id TEXT PRIMARY KEY,
+      month_id TEXT NOT NULL REFERENCES recon_months(id) ON DELETE CASCADE,
+      lot TEXT NOT NULL,
+      stock_number TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `)
   console.log('Database ready')
 }
 
@@ -144,6 +159,71 @@ app.put('/api/visits/:visitId/cars/:carId', async (req, res) => {
 app.delete('/api/visits/:visitId/cars/:carId', async (req, res) => {
   try {
     await pool.query('DELETE FROM cars WHERE id = $1 AND visit_id = $2', [req.params.carId, req.params.visitId])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── Reconciliation Routes ─────────────────────────────────────────────────────
+
+app.get('/api/recon', async (req, res) => {
+  try {
+    const { rows: months } = await pool.query('SELECT * FROM recon_months ORDER BY created_at DESC')
+    const { rows: stocks } = await pool.query('SELECT * FROM recon_stocks ORDER BY created_at ASC')
+    const result = months.map(m => ({
+      id: m.id,
+      month: m.month,
+      stocks: stocks.filter(s => s.month_id === m.id).map(s => ({
+        id: s.id, lot: s.lot, stock_number: s.stock_number,
+      })),
+    }))
+    res.json(result)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/recon', async (req, res) => {
+  try {
+    const { id, month } = req.body
+    await pool.query('INSERT INTO recon_months (id, month) VALUES ($1, $2)', [id, month])
+    res.json({ id, month, stocks: [] })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/recon/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM recon_months WHERE id = $1', [req.params.id])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/recon/:monthId/stocks', async (req, res) => {
+  try {
+    const { id, lot, stock_number } = req.body
+    await pool.query(
+      'INSERT INTO recon_stocks (id, month_id, lot, stock_number) VALUES ($1, $2, $3, $4)',
+      [id, req.params.monthId, lot, stock_number]
+    )
+    res.json({ id, lot, stock_number })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/recon/:monthId/stocks/:stockId', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM recon_stocks WHERE id = $1 AND month_id = $2', [req.params.stockId, req.params.monthId])
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
