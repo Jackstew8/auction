@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Printer, Trash2, Pencil, Check, Car, X,
   ArrowLeft, Calendar, MapPin, ChevronRight, Wrench, Paintbrush,
-  ClipboardList, Search,
+  ClipboardList, Search, Download,
 } from 'lucide-react'
+import ExcelJS from 'exceljs'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -155,6 +156,146 @@ function printVisit(visit) {
   const win = window.open('', '_blank', 'width=900,height=700')
   win.document.write(generatePrintHTML(visit))
   win.document.close()
+}
+
+// ─── Excel export ────────────────────────────────────────────────────────────
+
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+]
+
+async function exportMonthToExcel(month) {
+  const [year, monthNum] = month.month.split('-')
+  const titleText = `${year} ${MONTH_NAMES[parseInt(monthNum) - 1]} Lot Reconciliation`
+
+  const wb = new ExcelJS.Workbook()
+
+  const lotConfigs = [
+    { key: 'concrete', sheet: 'Hensley-Concrete', layout: 'hensley', labelSize: 24, gutter: 2.86 },
+    { key: 'gravel',   sheet: 'Hensley-Gravel',   layout: 'hensley', labelSize: 22, gutter: 3.14 },
+    { key: 'mosler',   sheet: 'Mosler',           layout: 'wide7',   dataCols: ['C','D','E','F','G','H','I'], totalCol: 'K', formulaEndCol: 'J', center: true },
+    { key: 'junkyard', sheet: 'Junkyard',         layout: 'wide7',   dataCols: ['D','E','F','G','H','I','J'], totalCol: 'I', formulaEndCol: 'J', center: false },
+  ]
+
+  for (const cfg of lotConfigs) {
+    const stocks = month.stocks
+      .filter(s => s.lot === cfg.key)
+      .map(s => parseInt(s.stock_number, 10))
+
+    const sheet = wb.addWorksheet(cfg.sheet)
+    sheet.views = [{ showGridLines: false }]
+
+    // Title row
+    sheet.mergeCells('A2:M2')
+    sheet.getRow(2).height = 38.25
+    const tCell = sheet.getCell('A2')
+    tCell.value = titleText
+    tCell.font = { name: 'Bahnschrift SemiLight', size: 36 }
+    tCell.alignment = { horizontal: 'center', vertical: 'center' }
+
+    if (cfg.layout === 'hensley') {
+      // Lot label E3:I3
+      sheet.mergeCells('E3:I3')
+      const lab = sheet.getCell('E3')
+      lab.value = cfg.sheet
+      lab.font = { name: 'Bahnschrift SemiLight', size: cfg.labelSize }
+      lab.alignment = { horizontal: 'center', vertical: 'center' }
+      sheet.getRow(3).height = 30
+
+      sheet.getColumn('A').width = 12.71
+      sheet.getColumn('G').width = cfg.gutter
+      sheet.getColumn('H').width = 12.71
+
+      // Split between columns E and H
+      const half = Math.ceil(stocks.length / 2)
+      const colE = stocks.slice(0, half)
+      const colH = stocks.slice(half)
+      const dataRows = Math.max(colE.length, colH.length, 1)
+
+      colE.forEach((n, i) => {
+        const c = sheet.getCell(`E${5 + i}`)
+        c.value = n
+        c.font = { name: 'Bahnschrift SemiBold', size: 22 }
+      })
+      colH.forEach((n, i) => {
+        const c = sheet.getCell(`H${5 + i}`)
+        c.value = n
+        c.font = { name: 'Bahnschrift SemiBold', size: 22 }
+      })
+
+      for (let r = 5; r <= 4 + dataRows; r++) {
+        sheet.getRow(r).height = 27
+      }
+
+      // Total row
+      const totalRow = 5 + dataRows + 1
+      const eCell = sheet.getCell(`E${totalRow}`)
+      eCell.value = 'Total:'
+      eCell.font = { name: 'Bahnschrift SemiBold', size: 22 }
+      const fCell = sheet.getCell(`F${totalRow}`)
+      fCell.value = { formula: `COUNT(E5:I${totalRow - 1})` }
+      fCell.font = { name: 'Bahnschrift SemiBold', size: 22 }
+
+    } else {
+      // Wide 7-column layout (Mosler, Junkyard)
+      sheet.mergeCells('F3:H3')
+      const lab = sheet.getCell('F3')
+      lab.value = cfg.sheet
+      lab.font = { name: 'Bahnschrift Light SemiCondensed', size: 22 }
+      lab.alignment = { horizontal: 'center', vertical: 'center' }
+      sheet.getRow(3).height = 27
+
+      sheet.getColumn('A').width = 12.71
+      if (cfg.key === 'mosler') {
+        const widths = { C: 13.57, D: 13.86, E: 14.71, F: 14.57, G: 14.86, H: 14.29, I: 13.71, J: 14.00, K: 12.71 }
+        for (const [col, w] of Object.entries(widths)) sheet.getColumn(col).width = w
+      }
+      if (cfg.key === 'junkyard') {
+        sheet.getRow(4).height = 15.75
+      }
+
+      // Distribute column-major across 7 columns
+      const NUM_COLS = 7
+      const rowsPerCol = Math.max(1, Math.ceil(stocks.length / NUM_COLS))
+      stocks.forEach((n, i) => {
+        const colIdx = Math.floor(i / rowsPerCol)
+        const rowOffset = i % rowsPerCol
+        const col = cfg.dataCols[colIdx] || cfg.dataCols[cfg.dataCols.length - 1]
+        const c = sheet.getCell(`${col}${5 + rowOffset}`)
+        c.value = n
+        c.font = { name: 'Bahnschrift SemiBold', size: 22 }
+        if (cfg.center) c.alignment = { horizontal: 'center', vertical: 'center' }
+      })
+
+      const dataRowHeight = cfg.key === 'junkyard' ? 27.75 : 27
+      for (let r = 5; r <= 4 + rowsPerCol; r++) {
+        sheet.getRow(r).height = dataRowHeight
+      }
+
+      // Total cell — single concatenated formula
+      const totalRow = 5 + rowsPerCol + 1
+      const lastDataRow = 4 + rowsPerCol
+      const firstCol = cfg.dataCols[0]
+      const endCol = cfg.formulaEndCol
+      const totalCell = sheet.getCell(`${cfg.totalCol}${totalRow}`)
+      totalCell.value = { formula: `"Total: " &COUNT(${firstCol}5:${endCol}${lastDataRow})` }
+      totalCell.font = { name: 'Bahnschrift SemiBold', size: 22 }
+    }
+  }
+
+  const buf = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${titleText}.xlsx`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 // ─── CarForm ─────────────────────────────────────────────────────────────────
@@ -802,6 +943,12 @@ function ReconMonthDetail({ month, onBack, onAddStock, onDeleteStock }) {
               <h1 className="font-bold text-sm leading-tight">{formatMonth(month.month)}</h1>
               <p className="text-[11px] text-gray-400 leading-tight">{total} total unit{total !== 1 ? 's' : ''}</p>
             </div>
+            {total > 0 && (
+              <button onClick={() => exportMonthToExcel(month)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-xs font-semibold transition-colors shrink-0">
+                <Download size={14} /> Excel
+              </button>
+            )}
           </div>
 
           {/* Lot tabs */}

@@ -13,6 +13,7 @@
     "concurrently": "^9.2.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "lucide-react": "^0.469.0",
     "pg": "^8.20.0",
