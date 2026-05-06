@@ -418,6 +418,260 @@ function CarForm({ initial, onSave, onCancel }) {
   )
 }
 
+// ─── CarWizard (page-by-page mobile add flow) ───────────────────────────────
+
+const WIZARD_STEPS = [
+  { key: 'lane',       title: 'Lane #',          type: 'number',   optional: true,  placeholder: 'e.g. 4' },
+  { key: 'run',        title: 'Run #',           type: 'number',   optional: true,  placeholder: 'e.g. 12' },
+  { key: 'year',       title: 'Year',            type: 'year' },
+  { key: 'make',       title: 'Make',            type: 'text',     placeholder: 'e.g. Honda' },
+  { key: 'model',      title: 'Model',           type: 'text',     placeholder: 'e.g. Accord' },
+  { key: 'color',      title: 'Color',           type: 'text',     optional: true,  placeholder: 'e.g. Black' },
+  { key: 'miles',      title: 'Mileage',         type: 'number',   optional: true,  placeholder: 'e.g. 85000' },
+  { key: 'maxBid',     title: 'Max Bid ($)',     type: 'number',   optional: true,  placeholder: 'e.g. 5000' },
+  { key: 'mmr',        title: 'MMR ($)',         type: 'number',   optional: true,  placeholder: 'e.g. 6500' },
+  { key: 'interest',   title: 'Interest Level',  type: 'interest' },
+  { key: 'tags',       title: 'Quick Tags',      type: 'tags',     optional: true },
+  { key: 'mechanical', title: 'Mechanical',      type: 'textarea', optional: true,  placeholder: 'e.g. Knock in front end, low coolant…' },
+  { key: 'cosmetic',   title: 'Cosmetic',        type: 'textarea', optional: true,  placeholder: 'e.g. Bumper damage, scratches on driver side…' },
+  { key: 'review',     title: 'Review',          type: 'review' },
+]
+
+function YearPicker({ value, onSelect }) {
+  const startYear = 2000
+  const endYear = new Date().getFullYear() + 1
+  const years = []
+  for (let y = endYear; y >= startYear; y--) years.push(y)
+  const selectedRef = useRef(null)
+
+  // Auto-scroll selected year into view when component mounts
+  useEffect(() => {
+    if (selectedRef.current) {
+      selectedRef.current.scrollIntoView({ block: 'center' })
+    }
+  }, [])
+
+  return (
+    <div className="bg-gray-50 border-2 border-gray-200 rounded-2xl overflow-hidden">
+      <div className="max-h-[55vh] overflow-y-auto">
+        {years.map(y => {
+          const isSelected = String(value) === String(y)
+          return (
+            <button key={y} ref={isSelected ? selectedRef : null}
+              onClick={() => onSelect(String(y))}
+              className={`w-full py-4 text-3xl font-bold transition-colors ${
+                isSelected
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 active:bg-gray-200'
+              }`}>
+              {y}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function CarWizard({ onSave, onCancel }) {
+  const [step, setStep] = useState(0)
+  const [form, setForm] = useState(emptyCarForm)
+  const inputRef = useRef(null)
+
+  const cur = WIZARD_STEPS[step]
+  const set = (f, v) => setForm(p => ({ ...p, [f]: v }))
+
+  // Required-field check
+  const isFilled = () => {
+    if (cur.optional) return true
+    if (cur.type === 'review') return true
+    if (cur.type === 'interest') return !!form.interest
+    if (cur.type === 'tags') return true
+    if (cur.type === 'year') return !!form.year
+    return form[cur.key] && String(form[cur.key]).trim().length > 0
+  }
+
+  const next = () => setStep(s => Math.min(s + 1, WIZARD_STEPS.length - 1))
+  const prev = () => setStep(s => Math.max(s - 1, 0))
+
+  const handleSubmit = () => {
+    if (!form.year || !form.make || !form.model) return
+    onSave({ ...form, id: String(Date.now()) })
+  }
+
+  // Auto-focus text/number/textarea inputs when step changes
+  useEffect(() => {
+    if (['text', 'number', 'textarea'].includes(cur.type)) {
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }, [step])
+
+  const toggleTag = (label) =>
+    set('tags', form.tags.includes(label) ? form.tags.filter(t => t !== label) : [...form.tags, label])
+
+  // Auto-advance helpers for selection-based steps
+  const selectAndAdvance = (key, val) => {
+    set(key, val)
+    setTimeout(next, 120)
+  }
+
+  const renderStep = () => {
+    if (cur.type === 'text' || cur.type === 'number') {
+      return (
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode={cur.type === 'number' ? 'numeric' : 'text'}
+          pattern={cur.type === 'number' ? '[0-9]*' : undefined}
+          className="w-full text-center text-3xl font-bold border-2 border-gray-200 rounded-2xl py-5 bg-gray-50 outline-none focus:border-blue-400"
+          placeholder={cur.placeholder}
+          value={form[cur.key] || ''}
+          onChange={e => set(cur.key, cur.type === 'number' ? e.target.value.replace(/\D/g, '') : e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && isFilled()) next() }}
+        />
+      )
+    }
+    if (cur.type === 'textarea') {
+      return (
+        <textarea
+          ref={inputRef}
+          rows={6}
+          className="w-full text-base border-2 border-gray-200 rounded-2xl p-4 bg-gray-50 outline-none focus:border-blue-400 resize-none"
+          placeholder={cur.placeholder}
+          value={form[cur.key] || ''}
+          onChange={e => set(cur.key, e.target.value)}
+        />
+      )
+    }
+    if (cur.type === 'year') {
+      return <YearPicker value={form.year} onSelect={(v) => selectAndAdvance('year', v)} />
+    }
+    if (cur.type === 'interest') {
+      return (
+        <div className="grid grid-cols-2 gap-3">
+          {INTEREST_LEVELS.map(lvl => (
+            <button key={lvl.value} type="button"
+              onClick={() => selectAndAdvance('interest', lvl.value)}
+              className={`py-6 text-base font-bold rounded-2xl border-2 transition-all ${
+                form.interest === lvl.value
+                  ? `${lvl.bg} ${lvl.text} ${lvl.border}`
+                  : 'bg-gray-50 text-gray-400 border-gray-200'
+              }`}>
+              {lvl.label}
+            </button>
+          ))}
+        </div>
+      )
+    }
+    if (cur.type === 'tags') {
+      return (
+        <div className="space-y-2.5">
+          {QUICK_TAGS.map(tag => (
+            <button key={tag.label} type="button" onClick={() => toggleTag(tag.label)}
+              className={`w-full py-4 text-base rounded-2xl border-2 font-semibold transition-all ${
+                form.tags.includes(tag.label) ? tag.color : 'bg-gray-50 text-gray-400 border-gray-200'
+              }`}>
+              {form.tags.includes(tag.label) ? '✓ ' : ''}{tag.label}
+            </button>
+          ))}
+        </div>
+      )
+    }
+    if (cur.type === 'review') {
+      const lvl = getLevel(form.interest)
+      return (
+        <div className="bg-gray-50 rounded-2xl p-4 space-y-3 max-h-[55vh] overflow-y-auto">
+          <ReviewRow label="Lane / Run" value={[form.lane && `Lane ${form.lane}`, form.run && `Run ${form.run}`].filter(Boolean).join(' · ') || '—'} onEdit={() => setStep(0)} />
+          <ReviewRow label="Vehicle"    value={`${form.year || '—'} ${form.make || ''} ${form.model || ''}`.trim()} onEdit={() => setStep(2)} />
+          <ReviewRow label="Color"      value={form.color || '—'} onEdit={() => setStep(5)} />
+          <ReviewRow label="Mileage"    value={form.miles ? `${form.miles} mi` : '—'} onEdit={() => setStep(6)} />
+          <ReviewRow label="Max Bid"    value={form.maxBid ? `$${form.maxBid}` : '—'} onEdit={() => setStep(7)} />
+          <ReviewRow label="MMR"        value={form.mmr ? `$${form.mmr}` : '—'} onEdit={() => setStep(8)} />
+          <ReviewRow label="Interest"   value={lvl.label} onEdit={() => setStep(9)} />
+          <ReviewRow label="Tags"       value={form.tags.length ? form.tags.join(', ') : '—'} onEdit={() => setStep(10)} />
+          <ReviewRow label="Mechanical" value={form.mechanical || '—'} onEdit={() => setStep(11)} multiline />
+          <ReviewRow label="Cosmetic"   value={form.cosmetic || '—'} onEdit={() => setStep(12)} multiline />
+        </div>
+      )
+    }
+    return null
+  }
+
+  const isLast = step === WIZARD_STEPS.length - 1
+  const filled = isFilled()
+  const requiredMissing = !form.year || !form.make || !form.model
+
+  return (
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+      {/* Top bar */}
+      <div className="bg-gray-900 text-white px-4 py-3 flex items-center gap-3 shrink-0">
+        <button onClick={onCancel} className="p-2 -ml-2 hover:bg-gray-800 rounded-lg">
+          <X size={20} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] text-gray-400 leading-tight">Step {step + 1} of {WIZARD_STEPS.length}</p>
+          <p className="text-base font-bold leading-tight">New Car</p>
+        </div>
+        {cur.optional && !isLast && (
+          <button onClick={next}
+            className="text-sm font-semibold text-gray-400 hover:text-white px-3 py-1.5">
+            Skip
+          </button>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1 bg-gray-200 shrink-0">
+        <div className="h-full bg-blue-600 transition-all"
+          style={{ width: `${((step + 1) / WIZARD_STEPS.length) * 100}%` }} />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-5">
+        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">
+          {cur.title}{cur.optional ? '' : ' *'}
+        </h2>
+        <p className="text-2xl font-bold text-gray-900 mb-5">{cur.title}?</p>
+        {renderStep()}
+      </div>
+
+      {/* Bottom action bar */}
+      <div className="border-t border-gray-200 bg-white p-3 flex gap-2 shrink-0">
+        <button onClick={prev} disabled={step === 0}
+          className="px-4 py-3.5 border border-gray-300 text-gray-600 rounded-xl text-base font-medium disabled:opacity-30">
+          <ArrowLeft size={18} />
+        </button>
+        {isLast ? (
+          <button onClick={handleSubmit} disabled={requiredMissing}
+            className="flex-1 bg-blue-600 disabled:bg-gray-300 text-white font-semibold py-3.5 rounded-xl text-base flex items-center justify-center gap-1.5">
+            <Check size={16} /> Save Car
+          </button>
+        ) : (
+          <button onClick={next} disabled={!filled}
+            className="flex-1 bg-blue-600 disabled:bg-gray-300 text-white font-semibold py-3.5 rounded-xl text-base flex items-center justify-center gap-1.5">
+            Next <ChevronRight size={16} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ReviewRow({ label, value, onEdit, multiline }) {
+  return (
+    <div className="flex items-start justify-between gap-3 bg-white rounded-xl p-3 border border-gray-100">
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">{label}</div>
+        <div className={`text-sm text-gray-900 mt-0.5 ${multiline ? 'whitespace-pre-wrap' : 'truncate'}`}>{value}</div>
+      </div>
+      <button onClick={onEdit}
+        className="p-1.5 text-gray-400 hover:text-blue-600 shrink-0">
+        <Pencil size={14} />
+      </button>
+    </div>
+  )
+}
+
 // ─── CarCard ─────────────────────────────────────────────────────────────────
 
 function CarCard({ car, onEdit, onDelete }) {
@@ -646,13 +900,11 @@ function VisitDetail({ visit, onBack, onUpdate }) {
         </div>
       </header>
 
+      {showForm && !editingCar && (
+        <CarWizard onSave={addCar} onCancel={() => setShowForm(false)} />
+      )}
+
       <main className="max-w-4xl mx-auto px-4 py-4 space-y-4">
-        {showForm && !editingCar && (
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">New Car</h2>
-            <CarForm onSave={addCar} onCancel={() => setShowForm(false)} />
-          </div>
-        )}
 
         {visit.cars.length > 0 && (
           <div className="flex gap-2 flex-wrap">
