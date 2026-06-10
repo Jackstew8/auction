@@ -59,6 +59,104 @@ function formatMonth(monthStr) {
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
+// ─── Offline-resilient API layer ──────────────────────────────────────────────
+//
+// Saves never block on the network: state updates immediately, the request
+// goes into a localStorage-backed outbox, and the outbox is replayed in order
+// whenever we're online. Survives page reloads, so nothing typed at the lot
+// is lost to bad signal.
+
+const OUTBOX_KEY = 'auction-outbox'
+const CACHE_KEY = 'auction-cache'
+
+function loadJSON(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback }
+}
+
+const outbox = {
+  queue: loadJSON(OUTBOX_KEY, []),
+  listeners: new Set(),
+  flushing: false,
+  notify() {
+    for (const l of this.listeners) l(this.queue.length)
+  },
+  push(req) {
+    this.queue.push(req)
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify(this.queue))
+    this.notify()
+    this.flush()
+  },
+  async flush() {
+    if (this.flushing) return
+    this.flushing = true
+    try {
+      while (this.queue.length > 0) {
+        const { method, url, body } = this.queue[0]
+        let res
+        try {
+          res = await fetch(url, {
+            method,
+            headers: body ? { 'Content-Type': 'application/json' } : undefined,
+            body: body ? JSON.stringify(body) : undefined,
+          })
+        } catch {
+          break // network down — leave the queue intact and retry later
+        }
+        if (res.status >= 500) break // server hiccup — retry later
+        // 2xx done; a 4xx request will never succeed, so drop it rather than jam the queue
+        this.queue.shift()
+        localStorage.setItem(OUTBOX_KEY, JSON.stringify(this.queue))
+        this.notify()
+      }
+    } finally {
+      this.flushing = false
+    }
+  },
+}
+
+function api(method, url, body) {
+  outbox.push({ method, url, body: body ?? null })
+}
+
+function SyncStatus({ stale, onRetry }) {
+  const [pending, setPending] = useState(outbox.queue.length)
+  const [online, setOnline] = useState(navigator.onLine)
+
+  useEffect(() => {
+    const onCount = (n) => setPending(n)
+    outbox.listeners.add(onCount)
+    const up = () => setOnline(true)
+    const down = () => setOnline(false)
+    window.addEventListener('online', up)
+    window.addEventListener('offline', down)
+    return () => {
+      outbox.listeners.delete(onCount)
+      window.removeEventListener('online', up)
+      window.removeEventListener('offline', down)
+    }
+  }, [])
+
+  return (
+    <>
+      {stale && (
+        <button onClick={onRetry}
+          className="fixed top-0 inset-x-0 z-50 bg-amber-500 text-white text-xs font-bold py-1.5 text-center">
+          Offline — showing data saved on this phone. Tap to retry.
+        </button>
+      )}
+      {pending > 0 && (
+        <div className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full shadow-lg text-xs font-bold text-white whitespace-nowrap ${
+          online ? 'bg-blue-600' : 'bg-gray-800'
+        }`}>
+          {online
+            ? `Syncing ${pending} change${pending === 1 ? '' : 's'}…`
+            : `Offline — ${pending} change${pending === 1 ? '' : 's'} saved on this phone`}
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── Print generator (opens a new window) ────────────────────────────────────
 
 const INTEREST_PRINT = {
@@ -867,29 +965,21 @@ function VisitDetail({ visit, onBack, onUpdate }) {
   const [editingCar, setEditingCar] = useState(null)
   const [filter, setFilter] = useState('all')
 
-  const addCar = async (car) => {
-    await fetch(`/api/visits/${visit.id}/cars`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(car),
-    })
+  const addCar = (car) => {
+    api('POST', `/api/visits/${visit.id}/cars`, car)
     onUpdate({ ...visit, cars: [...visit.cars, car] })
     setShowForm(false)
   }
 
-  const saveCar = async (updated) => {
-    await fetch(`/api/visits/${visit.id}/cars/${updated.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    })
+  const saveCar = (updated) => {
+    api('PUT', `/api/visits/${visit.id}/cars/${updated.id}`, updated)
     onUpdate({ ...visit, cars: visit.cars.map(c => c.id === updated.id ? updated : c) })
     setEditingCar(null)
   }
 
-  const deleteCar = async (id) => {
+  const deleteCar = (id) => {
     if (!confirm('Remove this car?')) return
-    await fetch(`/api/visits/${visit.id}/cars/${id}`, { method: 'DELETE' })
+    api('DELETE', `/api/visits/${visit.id}/cars/${id}`)
     onUpdate({ ...visit, cars: visit.cars.filter(c => c.id !== id) })
   }
 
@@ -1312,52 +1402,88 @@ export default function App() {
   const [activeMonthId, setActiveMonthId] = useState(null)
   const [showMonthForm, setShowMonthForm] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [stale, setStale] = useState(false)
+  const staleRef = useRef(false)
+  staleRef.current = stale
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/visits').then(r => r.json()).catch(() => []),
-      fetch('/api/recon').then(r => r.json()).catch(() => []),
-    ]).then(([v, r]) => {
+  const loadData = async () => {
+    // Replay anything queued from a previous session before fetching fresh data
+    await outbox.flush()
+    try {
+      const [v, r] = await Promise.all([
+        fetch('/api/visits').then(r => { if (!r.ok) throw new Error(r.status); return r.json() }),
+        fetch('/api/recon').then(r => { if (!r.ok) throw new Error(r.status); return r.json() }),
+      ])
       setVisits(Array.isArray(v) ? v : [])
       setReconMonths(Array.isArray(r) ? r : [])
-      setLoading(false)
-    })
+      setStale(false)
+    } catch {
+      // Server unreachable — fall back to the last data this phone saw
+      const cache = loadJSON(CACHE_KEY, null)
+      if (cache) {
+        setVisits(cache.visits || [])
+        setReconMonths(cache.recon || [])
+      }
+      setStale(true)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  // Keep the on-phone cache current so an offline reload shows everything
+  useEffect(() => {
+    if (!loading) localStorage.setItem(CACHE_KEY, JSON.stringify({ visits, recon: reconMonths }))
+  }, [visits, reconMonths, loading])
+
+  // Retry queued saves on reconnect and on a timer; refresh once fully synced
+  useEffect(() => {
+    const onUp = () => outbox.flush()
+    window.addEventListener('online', onUp)
+    const iv = setInterval(() => { if (outbox.queue.length > 0) outbox.flush() }, 15000)
+    const onDrained = (n) => { if (n === 0 && staleRef.current) loadData() }
+    outbox.listeners.add(onDrained)
+    return () => {
+      window.removeEventListener('online', onUp)
+      clearInterval(iv)
+      outbox.listeners.delete(onDrained)
+    }
   }, [])
 
   // ── Auction actions ───────────────────────────────────────────────────────
-  const addVisit = async (v) => {
-    await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) })
+  const addVisit = (v) => {
+    api('POST', '/api/visits', v)
     setVisits(p => [...p, v])
   }
-  const deleteVisit = async (id) => {
+  const deleteVisit = (id) => {
     if (!confirm('Delete this visit and all its cars?')) return
-    await fetch(`/api/visits/${id}`, { method: 'DELETE' })
+    api('DELETE', `/api/visits/${id}`)
     setVisits(p => p.filter(v => v.id !== id))
   }
   const updateVisit = (updated) => setVisits(p => p.map(v => v.id === updated.id ? updated : v))
 
   // ── Reconciliation actions ────────────────────────────────────────────────
-  const addMonth = async (monthStr) => {
+  const addMonth = (monthStr) => {
     const existing = reconMonths.find(m => m.month === monthStr)
     if (existing) { setActiveMonthId(existing.id); setShowMonthForm(false); return }
     const m = { id: String(Date.now()), month: monthStr, stocks: [] }
-    await fetch('/api/recon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) })
+    api('POST', '/api/recon', m)
     setReconMonths(p => [m, ...p])
     setActiveMonthId(m.id)
     setShowMonthForm(false)
   }
-  const deleteMonth = async (id) => {
+  const deleteMonth = (id) => {
     if (!confirm('Delete this month and all its stock numbers?')) return
-    await fetch(`/api/recon/${id}`, { method: 'DELETE' })
+    api('DELETE', `/api/recon/${id}`)
     setReconMonths(p => p.filter(m => m.id !== id))
   }
-  const addStock = async (monthId, lot, stockNumber) => {
+  const addStock = (monthId, lot, stockNumber) => {
     const s = { id: String(Date.now()), lot, stock_number: stockNumber }
-    await fetch(`/api/recon/${monthId}/stocks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) })
+    api('POST', `/api/recon/${monthId}/stocks`, s)
     setReconMonths(p => p.map(m => m.id === monthId ? { ...m, stocks: [...m.stocks, s] } : m))
   }
-  const deleteStock = async (monthId, stockId) => {
-    await fetch(`/api/recon/${monthId}/stocks/${stockId}`, { method: 'DELETE' })
+  const deleteStock = (monthId, stockId) => {
+    api('DELETE', `/api/recon/${monthId}/stocks/${stockId}`)
     setReconMonths(p => p.map(m => m.id === monthId ? { ...m, stocks: m.stocks.filter(s => s.id !== stockId) } : m))
   }
 
@@ -1370,26 +1496,37 @@ export default function App() {
   }
 
   // ── Detail views ──────────────────────────────────────────────────────────
+  const syncStatus = <SyncStatus stale={stale} onRetry={loadData} />
+
   const activeVisit = visits.find(v => v.id === activeVisitId)
   if (activeVisit) {
-    return <VisitDetail visit={activeVisit} onBack={() => setActiveVisitId(null)} onUpdate={updateVisit} />
+    return (
+      <>
+        {syncStatus}
+        <VisitDetail visit={activeVisit} onBack={() => setActiveVisitId(null)} onUpdate={updateVisit} />
+      </>
+    )
   }
 
   const activeMonth = reconMonths.find(m => m.id === activeMonthId)
   if (activeMonth) {
     return (
-      <ReconMonthDetail
-        month={activeMonth}
-        onBack={() => setActiveMonthId(null)}
-        onAddStock={(lot, num) => addStock(activeMonth.id, lot, num)}
-        onDeleteStock={(stockId) => deleteStock(activeMonth.id, stockId)}
-      />
+      <>
+        {syncStatus}
+        <ReconMonthDetail
+          month={activeMonth}
+          onBack={() => setActiveMonthId(null)}
+          onAddStock={(lot, num) => addStock(activeMonth.id, lot, num)}
+          onDeleteStock={(stockId) => deleteStock(activeMonth.id, stockId)}
+        />
+      </>
     )
   }
 
   // ── Home ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-100">
+      {syncStatus}
       <header className="bg-gray-900 text-white shadow-lg">
         <div className="max-w-4xl mx-auto px-4 pt-3 pb-0 space-y-3">
           {/* Section switcher */}

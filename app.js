@@ -104,8 +104,10 @@ app.get('/api/visits', async (req, res) => {
 app.post('/api/visits', async (req, res) => {
   try {
     const { id, name, date, location } = req.body
+    // ON CONFLICT: clients retry queued saves after network failures, so a
+    // request that already landed must succeed instead of erroring
     await pool.query(
-      'INSERT INTO visits (id, name, date, location) VALUES ($1, $2, $3, $4)',
+      'INSERT INTO visits (id, name, date, location) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
       [id, name, date || null, location || null]
     )
     res.json({ id, name, date: date || '', location: location || '', cars: [] })
@@ -130,7 +132,8 @@ app.post('/api/visits/:visitId/cars', async (req, res) => {
     const { id, run, lane, year, make, model, color, miles, maxBid, mmr, interest, tags, mechanical, cosmetic } = req.body
     await pool.query(
       `INSERT INTO cars (id, visit_id, run, lane, year, make, model, color, miles, max_bid, mmr, interest, tags, mechanical, cosmetic)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       ON CONFLICT (id) DO NOTHING`,
       [id, req.params.visitId, run, lane, year, make, model, color, miles, maxBid, mmr, interest, JSON.stringify(tags || []), mechanical, cosmetic]
     )
     res.json(req.body)
@@ -189,7 +192,7 @@ app.get('/api/recon', async (req, res) => {
 app.post('/api/recon', async (req, res) => {
   try {
     const { id, month } = req.body
-    await pool.query('INSERT INTO recon_months (id, month) VALUES ($1, $2)', [id, month])
+    await pool.query('INSERT INTO recon_months (id, month) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING', [id, month])
     res.json({ id, month, stocks: [] })
   } catch (err) {
     console.error(err)
@@ -211,7 +214,7 @@ app.post('/api/recon/:monthId/stocks', async (req, res) => {
   try {
     const { id, lot, stock_number } = req.body
     await pool.query(
-      'INSERT INTO recon_stocks (id, month_id, lot, stock_number) VALUES ($1, $2, $3, $4)',
+      'INSERT INTO recon_stocks (id, month_id, lot, stock_number) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
       [id, req.params.monthId, lot, stock_number]
     )
     res.json({ id, lot, stock_number })
