@@ -206,8 +206,10 @@ async function exportMonthToExcel(month) {
       sheet.getRow(3).height = 30
 
       sheet.getColumn('A').width = 12.71
+      // Data columns must fit 5 digits at 22pt — Excel shows ##### otherwise
+      sheet.getColumn('E').width = 14.00
       sheet.getColumn('G').width = cfg.gutter
-      sheet.getColumn('H').width = 12.71
+      sheet.getColumn('H').width = 14.00
 
       // Split between columns E and H
       const half = Math.ceil(stocks.length / 2)
@@ -258,6 +260,8 @@ async function exportMonthToExcel(month) {
       }
       if (cfg.key === 'junkyard') {
         sheet.getRow(4).height = 15.75
+        // Junkyard data columns need explicit widths too, or they render #####
+        for (const col of cfg.dataCols) sheet.getColumn(col).width = 14.00
       }
 
       // Distribute column-major across 7 columns
