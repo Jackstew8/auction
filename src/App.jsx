@@ -78,11 +78,28 @@ function generatePrintHTML(visit) {
   const carRows = sorted.map((car, idx) => {
     const lvl = INTEREST_PRINT[car.interest] || INTEREST_PRINT.maybe
     const runLabel = [car.lane && `Lane ${car.lane}`, car.run && `Run ${car.run}`].filter(Boolean).join(' · ')
-    const metaParts = [car.color, car.miles ? `${car.miles} mi` : ''].filter(Boolean).join(' · ')
-    const tagBadges = car.tags.map(t => `<span class="tag">${t}</span>`).join('')
+    const miles = /^\d+$/.test((car.miles || '').trim())
+      ? Number(car.miles.trim()).toLocaleString('en-US')
+      : car.miles
+    const metaParts = [car.color, car.miles ? `<b class="miles">${miles} mi</b>` : ''].filter(Boolean).join(' · ')
+
+    // Promote "green light" from the mechanical notes to its own badge
+    const greenLight = /green\s*light/i.test(car.mechanical)
+    const mechanical = greenLight
+      ? car.mechanical.replace(/green\s*light[\s,;.!-]*/i, '').trim()
+      : car.mechanical
+    const tagBadges = [
+      greenLight ? '<span class="tag tag-green">✓ GREEN LIGHT</span>' : '',
+      ...car.tags.map(t => `<span class="tag">${t}</span>`),
+    ].filter(Boolean).join('')
+
+    const notes = [
+      mechanical ? `<div class="detail-row"><span class="detail-label">Mechanical:</span><span class="detail-text">${mechanical}</span></div>` : '',
+      car.cosmetic ? `<div class="detail-row"><span class="detail-label">Cosmetic:</span><span class="detail-text">${car.cosmetic}</span></div>` : '',
+    ].filter(Boolean).join('')
 
     return `
-    <div class="car${idx % 2 === 1 ? ' car-alt' : ''}">
+    <div class="car${idx % 2 === 1 ? ' car-alt' : ''}" style="border-left:5px solid ${lvl.color}">
       <div class="car-top">
         <div class="car-left">
           ${runLabel ? `<span class="badge badge-lane">${runLabel}</span>` : ''}
@@ -92,14 +109,10 @@ function generatePrintHTML(visit) {
         <div class="car-right">
           ${car.mmr ? `<span class="badge badge-mmr">MMR $${car.mmr}</span>` : ''}
           ${car.maxBid ? `<span class="badge badge-dark">Max $${car.maxBid}</span>` : ''}
-          <span class="interest" style="color:${lvl.color};border-color:${lvl.color}">${lvl.label}</span>
         </div>
       </div>
-      ${car.tags.length > 0 ? `<div class="tags">${tagBadges}</div>` : ''}
-      <div class="details">
-        ${car.mechanical ? `<div class="detail-row"><span class="detail-label">Mechanical:</span><span class="detail-text">${car.mechanical}</span></div>` : ''}
-        ${car.cosmetic   ? `<div class="detail-row"><span class="detail-label">Cosmetic:</span><span class="detail-text">${car.cosmetic}</span></div>` : ''}
-      </div>
+      ${tagBadges ? `<div class="tags">${tagBadges}</div>` : ''}
+      ${notes ? `<div class="details">${notes}</div>` : '<div class="no-notes">No issues noted</div>'}
     </div>`
   }).join('')
 
@@ -115,9 +128,10 @@ function generatePrintHTML(visit) {
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     @page { margin: 0.4in 0.45in; }
     body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; font-size: 11pt; color: #111; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5px solid #111; padding-bottom: 6px; margin-bottom: 10px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5px solid #111; padding-bottom: 6px; margin-bottom: 4px; }
     .header-title { font-size: 15pt; font-weight: 800; letter-spacing: -0.3px; }
     .header-meta  { font-size: 9.5pt; color: #555; text-align: right; line-height: 1.5; }
+    .legend { font-size: 8pt; color: #999; text-align: right; margin-bottom: 8px; }
     .cars { display: flex; flex-direction: column; gap: 5px; }
     .car { border: 1px solid #d1d5db; border-radius: 5px; padding: 8px 12px; break-inside: avoid; page-break-inside: avoid; background: #ffffff; }
     .car-alt { background: #eef4ff; }
@@ -130,9 +144,11 @@ function generatePrintHTML(visit) {
     .badge-mmr  { background: #7c3aed; color: #fff; }
     .car-name { font-size: 12pt; font-weight: 700; }
     .car-meta { font-size: 9.5pt; color: #555; }
-    .interest { font-size: 9pt; font-weight: 800; letter-spacing: 0.4px; padding: 2px 8px; border-radius: 3px; border: 1.5px solid; white-space: nowrap; }
+    .car-meta .miles { color: #111; font-weight: 700; }
     .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
     .tag { font-size: 9pt; font-weight: 600; padding: 1px 7px; border-radius: 20px; border: 1px solid #999; color: #444; background: #fff; }
+    .tag-green { background: #dcfce7; color: #15803d; border-color: #4ade80; font-weight: 800; }
+    .no-notes { margin-top: 4px; font-size: 9pt; color: #9ca3af; font-style: italic; }
     .details { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; }
     .detail-row { display: flex; gap: 6px; font-size: 9.5pt; line-height: 1.4; }
     .detail-label { font-weight: 700; text-transform: uppercase; font-size: 8pt; color: #555; white-space: nowrap; padding-top: 1px; }
@@ -145,6 +161,7 @@ function generatePrintHTML(visit) {
     <div class="header-title">${visit.name} — Preview Notes</div>
     <div class="header-meta">${meta}</div>
   </div>
+  <div class="legend">Left edge color = interest: <span style="color:#b91c1c;font-weight:700">Hot Buy</span> · <span style="color:#15803d;font-weight:700">Good Deal</span> · <span style="color:#b45309;font-weight:700">Maybe</span> · <span style="color:#6b7280;font-weight:700">Pass</span></div>
   <div class="cars">${carRows}</div>
   <div class="footer">Printed ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
   <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};</script>
