@@ -170,6 +170,8 @@ async function exportMonthToExcel(month) {
   const titleText = `${year} ${MONTH_NAMES[parseInt(monthNum) - 1]} Lot Reconciliation`
 
   const wb = new ExcelJS.Workbook()
+  // Force Excel to recalculate on open so totals stay correct even if cached
+  wb.calcProperties.fullCalcOnLoad = true
 
   const lotConfigs = [
     { key: 'concrete', sheet: 'Hensley-Concrete', layout: 'hensley', labelSize: 24, gutter: 2.86 },
@@ -192,7 +194,7 @@ async function exportMonthToExcel(month) {
     const tCell = sheet.getCell('A2')
     tCell.value = titleText
     tCell.font = { name: 'Bahnschrift SemiLight', size: 36 }
-    tCell.alignment = { horizontal: 'center', vertical: 'center' }
+    tCell.alignment = { horizontal: 'center', vertical: 'middle' }
 
     if (cfg.layout === 'hensley') {
       // Lot label E3:I3
@@ -200,7 +202,7 @@ async function exportMonthToExcel(month) {
       const lab = sheet.getCell('E3')
       lab.value = cfg.sheet
       lab.font = { name: 'Bahnschrift SemiLight', size: cfg.labelSize }
-      lab.alignment = { horizontal: 'center', vertical: 'center' }
+      lab.alignment = { horizontal: 'center', vertical: 'middle' }
       sheet.getRow(3).height = 30
 
       sheet.getColumn('A').width = 12.71
@@ -216,11 +218,13 @@ async function exportMonthToExcel(month) {
       colE.forEach((n, i) => {
         const c = sheet.getCell(`E${5 + i}`)
         c.value = n
+        c.numFmt = '00000' // stock numbers are always 5 digits; keep leading zeros visible
         c.font = { name: 'Bahnschrift SemiBold', size: 22 }
       })
       colH.forEach((n, i) => {
         const c = sheet.getCell(`H${5 + i}`)
         c.value = n
+        c.numFmt = '00000'
         c.font = { name: 'Bahnschrift SemiBold', size: 22 }
       })
 
@@ -234,7 +238,8 @@ async function exportMonthToExcel(month) {
       eCell.value = 'Total:'
       eCell.font = { name: 'Bahnschrift SemiBold', size: 22 }
       const fCell = sheet.getCell(`F${totalRow}`)
-      fCell.value = { formula: `COUNT(E5:I${totalRow - 1})` }
+      // result: viewers that don't recalculate (Dropbox/mobile previews) show the cached value
+      fCell.value = { formula: `COUNT(E5:I${totalRow - 1})`, result: stocks.length }
       fCell.font = { name: 'Bahnschrift SemiBold', size: 22 }
 
     } else {
@@ -243,7 +248,7 @@ async function exportMonthToExcel(month) {
       const lab = sheet.getCell('F3')
       lab.value = cfg.sheet
       lab.font = { name: 'Bahnschrift Light SemiCondensed', size: 22 }
-      lab.alignment = { horizontal: 'center', vertical: 'center' }
+      lab.alignment = { horizontal: 'center', vertical: 'middle' }
       sheet.getRow(3).height = 27
 
       sheet.getColumn('A').width = 12.71
@@ -264,8 +269,9 @@ async function exportMonthToExcel(month) {
         const col = cfg.dataCols[colIdx] || cfg.dataCols[cfg.dataCols.length - 1]
         const c = sheet.getCell(`${col}${5 + rowOffset}`)
         c.value = n
+        c.numFmt = '00000'
         c.font = { name: 'Bahnschrift SemiBold', size: 22 }
-        if (cfg.center) c.alignment = { horizontal: 'center', vertical: 'center' }
+        if (cfg.center) c.alignment = { horizontal: 'center', vertical: 'middle' }
       })
 
       const dataRowHeight = cfg.key === 'junkyard' ? 27.75 : 27
@@ -279,7 +285,7 @@ async function exportMonthToExcel(month) {
       const firstCol = cfg.dataCols[0]
       const endCol = cfg.formulaEndCol
       const totalCell = sheet.getCell(`${cfg.totalCol}${totalRow}`)
-      totalCell.value = { formula: `"Total: " &COUNT(${firstCol}5:${endCol}${lastDataRow})` }
+      totalCell.value = { formula: `"Total: " &COUNT(${firstCol}5:${endCol}${lastDataRow})`, result: `Total: ${stocks.length}` }
       totalCell.font = { name: 'Bahnschrift SemiBold', size: 22 }
     }
   }
