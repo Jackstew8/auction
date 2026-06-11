@@ -37,6 +37,11 @@ const emptyCarForm = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function genId() {
+  // Date.now() alone can collide across fast entries or two devices
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 function getLevel(value) {
   return INTEREST_LEVELS.find(l => l.value === value) || INTEREST_LEVELS[2]
 }
@@ -435,7 +440,7 @@ function CarForm({ initial, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!form.year || !form.make || !form.model) return
-    onSave({ ...form, id: initial?.id || String(Date.now()) })
+    onSave({ ...form, id: initial?.id || genId() })
   }
 
   return (
@@ -621,7 +626,7 @@ function CarWizard({ onSave, onCancel }) {
 
   const handleSubmit = () => {
     if (!form.year || !form.make || !form.model) return
-    onSave({ ...form, id: String(Date.now()) })
+    onSave({ ...form, id: genId() })
   }
 
   // Auto-focus text/number/textarea inputs when step changes
@@ -880,7 +885,7 @@ function VisitForm({ onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!name) return
-    onSave({ id: String(Date.now()), name, date, location, cars: [] })
+    onSave({ id: genId(), name, date, location, cars: [] })
   }
 
   return (
@@ -1078,7 +1083,14 @@ function LotView({ lot, stocks, onAdd, onDelete }) {
 
   const submit = (val) => {
     if (!/^\d{5}$/.test(val)) { setError('Must be exactly 5 digits'); return }
-    if (lotStocks.find(s => s.stock_number === val)) { setError('Already in this lot'); return }
+    // A car can only be on one lot — check the whole month, not just this lot
+    const dupe = stocks.find(s => s.stock_number === val)
+    if (dupe) {
+      setError(dupe.lot === lot.key
+        ? 'Already in this lot'
+        : `Already on ${LOTS.find(l => l.key === dupe.lot)?.label || dupe.lot}!`)
+      return
+    }
     onAdd(lot.key, val)
     setInput('')
     setError('')
@@ -1297,8 +1309,28 @@ function MonthForm({ existingMonths, onSave, onCancel }) {
 
 function ReconMonthDetail({ month, onBack, onAddStock, onDeleteStock }) {
   const [activeLot, setActiveLot] = useState('concrete')
+  const [undo, setUndo] = useState(null)
+  const undoTimer = useRef(null)
   const lot = LOTS.find(l => l.key === activeLot)
   const total = month.stocks.length
+
+  // Deletes are one tap with no confirm, so give a 5s window to take it back
+  const deleteWithUndo = (stockId) => {
+    const stock = month.stocks.find(s => s.id === stockId)
+    onDeleteStock(stockId)
+    if (!stock) return
+    clearTimeout(undoTimer.current)
+    setUndo(stock)
+    undoTimer.current = setTimeout(() => setUndo(null), 5000)
+  }
+
+  const undoDelete = () => {
+    clearTimeout(undoTimer.current)
+    if (undo) onAddStock(undo.lot, undo.stock_number)
+    setUndo(null)
+  }
+
+  useEffect(() => () => clearTimeout(undoTimer.current), [])
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -1346,9 +1378,19 @@ function ReconMonthDetail({ month, onBack, onAddStock, onDeleteStock }) {
           lot={lot}
           stocks={month.stocks}
           onAdd={onAddStock}
-          onDelete={onDeleteStock}
+          onDelete={deleteWithUndo}
         />
       </main>
+
+      {undo && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-gray-900 text-white pl-4 pr-1.5 py-1.5 rounded-full shadow-lg text-sm whitespace-nowrap">
+          <span>Deleted <b className="font-mono">{undo.stock_number}</b></span>
+          <button onClick={undoDelete}
+            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-full text-xs font-bold">
+            UNDO
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -1466,7 +1508,7 @@ export default function App() {
   const addMonth = (monthStr) => {
     const existing = reconMonths.find(m => m.month === monthStr)
     if (existing) { setActiveMonthId(existing.id); setShowMonthForm(false); return }
-    const m = { id: String(Date.now()), month: monthStr, stocks: [] }
+    const m = { id: genId(), month: monthStr, stocks: [] }
     api('POST', '/api/recon', m)
     setReconMonths(p => [m, ...p])
     setActiveMonthId(m.id)
@@ -1478,7 +1520,7 @@ export default function App() {
     setReconMonths(p => p.filter(m => m.id !== id))
   }
   const addStock = (monthId, lot, stockNumber) => {
-    const s = { id: String(Date.now()), lot, stock_number: stockNumber }
+    const s = { id: genId(), lot, stock_number: stockNumber }
     api('POST', `/api/recon/${monthId}/stocks`, s)
     setReconMonths(p => p.map(m => m.id === monthId ? { ...m, stocks: [...m.stocks, s] } : m))
   }
